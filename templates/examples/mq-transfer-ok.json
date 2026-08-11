@@ -1,0 +1,11 @@
+{
+  "requestId": "{{requestId}}",
+  "status": "OK",
+  "cuentaOrigen": "{{cuentaOrigen}}",
+  "cuentaDestino": "{{cuentaDestino}}",
+  "monto": {{monto}},
+  "moneda": "{{moneda}}",
+  "movimientoDebitoId": "{{$uuid}}",
+  "movimientoCreditoId": "{{$uuid}}",
+  "procesadoEn": "{{$timestamp}}"
+}

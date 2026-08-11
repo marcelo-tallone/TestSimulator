@@ -1,0 +1,29 @@
+{
+  "name": "Mock API Cuentas",
+  "type": "ws",
+  "ws": {
+    "port": 3002,
+    "path": "/v1/cuentas/by-numero/:numeroCuenta",
+    "method": "GET",
+    "responseFormat": "json",
+    "defaultStatusCode": 200
+  },
+  "rules": [
+    {
+      "name": "Cuenta activa ARS",
+      "priority": 1,
+      "condition": { "type": "regex", "field": "path", "pattern": "by-numero/0000001" },
+      "response": { "templateFile": "examples/cuenta-activa-ars.json", "statusCode": 200 }
+    },
+    {
+      "name": "Cuenta no encontrada",
+      "priority": 10,
+      "condition": { "type": "regex", "field": "path", "pattern": "by-numero/9999999" },
+      "response": { "inlineBody": { "error": "Cuenta no encontrada" }, "statusCode": 404 }
+    }
+  ],
+  "defaultResponse": {
+    "inlineBody": { "numeroCuenta": "desconocido", "estado": "ACTIVA", "saldo": 0 },
+    "statusCode": 200
+  }
+}

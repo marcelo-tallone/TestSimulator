@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TestSimulator</title>
+<style>
+  :root {
+    --bg: #0f1226; --panel: #1a1e3a; --panel2: #232848; --txt: #e7e9f5;
+    --muted: #9aa0c7; --accent: #7c6cff; --green: #3ecf8e; --red: #ff6b6b;
+    --amber: #f5b74f; --border: #2c315c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--txt); }
+  header { display: flex; align-items: center; gap: 16px; padding: 18px 28px;
+    background: linear-gradient(90deg, #4f46e5, #7c3aed); }
+  header h1 { font-size: 20px; margin: 0; font-weight: 600; }
+  header .summary { margin-left: auto; display: flex; gap: 18px; font-size: 13px; }
+  header .summary b { font-size: 16px; }
+  main { padding: 24px 28px; max-width: 1180px; margin: 0 auto; }
+  .toolbar { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  button { background: var(--panel2); color: var(--txt); border: 1px solid var(--border);
+    padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); }
+  button.start { color: var(--green); } button.stop { color: var(--red); }
+  button.icon { padding: 6px 9px; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel);
+    border-radius: 12px; overflow: hidden; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border);
+    font-size: 13px; vertical-align: middle; }
+  th { color: var(--muted); font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: .5px; }
+  tr:last-child td { border-bottom: none; }
+  .badge { padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge.running { background: rgba(62,207,142,.15); color: var(--green); }
+  .badge.stopped { background: rgba(154,160,199,.15); color: var(--muted); }
+  .badge.error { background: rgba(255,107,107,.15); color: var(--red); }
+  .type { font-family: ui-monospace, monospace; color: var(--amber); }
+  .epurl { font-family: ui-monospace, monospace; color: var(--txt); font-size: 12px;
+    background: var(--bg); padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border); }
+  .method { font-family: ui-monospace, monospace; color: var(--muted); font-size: 11px; }
+  .copy { padding: 3px 7px; font-size: 12px; margin-left: 4px; }
+  .actions { display: flex; gap: 6px; }
+  .empty { text-align: center; color: var(--muted); padding: 40px; }
+  dialog { background: var(--panel); color: var(--txt); border: 1px solid var(--border);
+    border-radius: 12px; padding: 22px; width: min(720px, 94vw); }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  dialog h2 { margin: 0 0 14px; font-size: 16px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+  input, select, textarea { width: 100%; margin-top: 5px; background: var(--bg); color: var(--txt);
+    border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; font-size: 13px; }
+  textarea { font-family: ui-monospace, monospace; font-size: 12px; min-height: 180px; resize: vertical; }
+  .row { display: flex; gap: 12px; }
+  .row > label { flex: 1; }
+  details { margin-bottom: 10px; }
+  summary { cursor: pointer; color: var(--accent); font-size: 12px; margin-bottom: 8px; }
+  pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; overflow: auto; max-height: 55vh; font-size: 12px; }
+  .dlg-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+  .hint { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🛰️ TestSimulator</h1>
+  <div class="summary" id="summary"></div>
+</header>
+<main>
+  <div class="toolbar">
+    <button class="primary" onclick="openNew()">+ Nueva simulación</button>
+    <button class="start" onclick="api('/start-all','POST').then(load)">▶ Iniciar todas</button>
+    <button class="stop" onclick="api('/stop-all','POST').then(load)">■ Detener todas</button>
+    <button onclick="load()">↻ Refrescar</button>
+  </div>
+  <table>
+    <thead><tr><th>Nombre</th><th>Tipo</th><th>URL / Cola</th><th>Estado</th><th>Acciones</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</main>
+
+<dialog id="newDlg">
+  <h2 id="dlgTitle">Nueva simulación</h2>
+  <div class="hint">Definí el endpoint y pegá el JSON (o XML) que querés que devuelva.</div>
+
+  <label>Nombre <input id="f_name" placeholder="Mock pagos" /></label>
+
+  <div class="row">
+    <label>Tipo
+      <select id="f_type" onchange="toggleType()">
+        <option value="ws">Web Service (HTTP)</option>
+        <option value="mq">Cola (MQ / STOMP)</option>
+      </select>
+    </label>
+    <label>Formato de respuesta
+      <select id="f_format">
+        <option value="json">JSON</option>
+        <option value="xml">XML</option>
+        <option value="soap">SOAP</option>
+        <option value="text">Texto</option>
+      </select>
+    </label>
+  </div>
+
+  <div id="ws_fields">
+    <div class="row">
+      <label>Puerto <input id="f_port" type="number" value="4001" /></label>
+      <label>Ruta <input id="f_path" value="/" /></label>
+      <label>Método
+        <select id="f_method">
+          <option>GET</option><option>POST</option><option>PUT</option>
+          <option>DELETE</option><option>PATCH</option><option>ANY</option>
+        </select>
+      </label>
+      <label>HTTP status <input id="f_status" type="number" value="200" /></label>
+    </div>
+  </div>
+
+  <div id="mq_fields" style="display:none">
+    <div class="row">
+      <label>Host <input id="f_host" value="localhost" /></label>
+      <label>Puerto <input id="f_mqport" type="number" value="61613" /></label>
+    </div>
+    <div class="row">
+      <label>Cola de entrada <input id="f_inq" value="REQUEST.QUEUE" /></label>
+      <label>Cola de salida <input id="f_outq" value="RESPONSE.QUEUE" /></label>
+    </div>
+  </div>
+
+  <label>Respuesta (lo que querés que devuelva)
+    <textarea id="f_body" placeholder='{ "status": "OK", "id": "{{$uuid}}" }'></textarea>
+  </label>
+
+  <details id="advDetails">
+    <summary>Avanzado: pegar la definición JSON completa de la simulación</summary>
+    <div class="hint">Si completás esto, se ignora el formulario de arriba. Útil para reglas de matching, variables, etc. (ver README).</div>
+    <textarea id="f_full" placeholder='{ "name": "...", "type": "ws", "ws": {...}, "rules": [...], "defaultResponse": {...} }'></textarea>
+  </details>
+
+  <div class="dlg-actions">
+    <button onclick="newDlg.close()">Cancelar</button>
+    <button class="primary" id="saveBtn" onclick="saveSim()">Crear</button>
+  </div>
+</dialog>
+
+<dialog id="logDlg">
+  <h2>Logs</h2>
+  <pre id="logBody"></pre>
+  <div class="dlg-actions"><button onclick="logDlg.close()">Cerrar</button></div>
+</dialog>
+
+<script>
+const API = '/api';
+const $ = id => document.getElementById(id);
+const val = id => ($(id).value || '').trim();
+let simsById = {};
+let editingId = null;
+let editingStatus = null;
+
+async function api(path, method = 'GET', body) {
+  const opts = { method, headers: {} };
+  if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const res = await fetch(API + path, opts);
+  if (res.status === 204) return null;
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return text; }
+}
+
+function urlOf(s) { return `http://localhost:${s.ws.port}${s.ws.path}`; }
+
+function endpointCell(s) {
+  if (s.type === 'ws' && s.ws) {
+    const url = urlOf(s);
+    return `<span class="epurl">${url}</span> <span class="method">[${s.ws.method}]</span>` +
+      `<button class="copy" title="Copiar URL" onclick='copyText(${JSON.stringify(url)}, this)'>📋</button>`;
+  }
+  if (s.type === 'mq' && s.mq) {
+    return `<span class="epurl">${s.mq.inputQueue} → ${s.mq.outputQueue}</span>` +
+      `<button class="copy" title="Copiar cola de entrada" onclick='copyText(${JSON.stringify(s.mq.inputQueue)}, this)'>📋</button>`;
+  }
+  return '—';
+}
+
+async function copyText(text, btn) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch {}
+    ta.remove();
+  }
+  const old = btn.textContent; btn.textContent = '✓';
+  setTimeout(() => { btn.textContent = old; }, 1000);
+}
+
+async function load() {
+  const [sims, status] = await Promise.all([api('/simulations'), api('/status')]);
+  simsById = {};
+  sims.forEach(s => { simsById[s.id] = s; });
+  $('summary').innerHTML =
+    `<span>▶ <b style="color:var(--green)">${status.running}</b> activas</span>` +
+    `<span>■ <b>${status.stopped}</b> detenidas</span>` +
+    `<span>⚠ <b style="color:var(--red)">${status.error}</b> error</span>`;
+  const rows = $('rows');
+  if (!sims.length) { rows.innerHTML = '<tr><td colspan="5" class="empty">No hay simulaciones. Creá una con “+ Nueva simulación”.</td></tr>'; return; }
+  rows.innerHTML = sims.map(s => `
+    <tr>
+      <td>${s.name}</td>
+      <td><span class="type">${s.type.toUpperCase()}</span></td>
+      <td>${endpointCell(s)}</td>
+      <td><span class="badge ${s.status}">${s.status}</span></td>
+      <td class="actions">
+        ${s.status === 'running'
+          ? `<button class="stop" onclick="act('${s.id}','stop')">Detener</button>`
+          : `<button class="start" onclick="act('${s.id}','start')">Iniciar</button>`}
+        <button class="icon" title="Editar" onclick="openEdit('${s.id}')">✎</button>
+        <button class="icon" title="Logs" onclick="showLogs('${s.id}')">Logs</button>
+        <button class="icon" title="Eliminar" onclick="delSim('${s.id}','${s.status}')">🗑</button>
+      </td>
+    </tr>`).join('');
+}
+
+async function act(id, action) {
+  const r = await api(`/simulations/${id}/${action}`, 'POST');
+  if (r && r.error) alert(r.error);
+  load();
+}
+async function delSim(id, status) {
+  if (status === 'running') { alert('Detené la simulación antes de eliminarla.'); return; }
+  if (!confirm('¿Eliminar esta simulación?')) return;
+  await api(`/simulations/${id}`, 'DELETE'); load();
+}
+async function showLogs(id) {
+  const logs = await api(`/simulations/${id}/logs?limit=50`);
+  $('logBody').textContent = (Array.isArray(logs) && logs.length) ? JSON.stringify(logs, null, 2) : 'Sin logs todavía.';
+  logDlg.showModal();
+}
+
+function toggleType() {
+  const mq = val('f_type') === 'mq';
+  $('ws_fields').style.display = mq ? 'none' : 'block';
+  $('mq_fields').style.display = mq ? 'block' : 'none';
+}
+
+function resetForm() {
+  $('f_name').value = ''; $('f_type').value = 'ws'; $('f_format').value = 'json';
+  $('f_port').value = 4001; $('f_path').value = '/'; $('f_method').value = 'GET'; $('f_status').value = 200;
+  $('f_host').value = 'localhost'; $('f_mqport').value = 61613;
+  $('f_inq').value = 'REQUEST.QUEUE'; $('f_outq').value = 'RESPONSE.QUEUE';
+  $('f_body').value = ''; $('f_full').value = '';
+  $('advDetails').open = false;
+}
+
+function openNew() {
+  editingId = null; editingStatus = null;
+  $('dlgTitle').textContent = 'Nueva simulación';
+  $('saveBtn').textContent = 'Crear';
+  resetForm(); toggleType();
+  newDlg.showModal();
+}
+
+function bodyToText(inlineBody) {
+  if (inlineBody === undefined || inlineBody === null) return '';
+  return typeof inlineBody === 'string' ? inlineBody : JSON.stringify(inlineBody, null, 2);
+}
+
+function openEdit(id) {
+  const s = simsById[id];
+  if (!s) return;
+  editingId = id; editingStatus = s.status;
+  $('dlgTitle').textContent = 'Editar simulación';
+  $('saveBtn').textContent = 'Guardar';
+  resetForm();
+
+  $('f_name').value = s.name || '';
+  $('f_type').value = s.type;
+  $('f_format').value = (s.type === 'ws' ? s.ws?.responseFormat : s.mq?.responseFormat) || 'json';
+  if (s.type === 'ws' && s.ws) {
+    $('f_port').value = s.ws.port; $('f_path').value = s.ws.path;
+    $('f_method').value = s.ws.method; $('f_status').value = s.ws.defaultStatusCode ?? 200;
+  } else if (s.type === 'mq' && s.mq) {
+    $('f_host').value = s.mq.host; $('f_mqport').value = s.mq.port;
+    $('f_inq').value = s.mq.inputQueue; $('f_outq').value = s.mq.outputQueue;
+  }
+  toggleType();
+
+  const isSimple = (!s.rules || s.rules.length === 0) &&
+    s.defaultResponse && s.defaultResponse.templateFile === undefined;
+  if (isSimple) {
+    $('f_body').value = bodyToText(s.defaultResponse?.inlineBody);
+  } else {
+    // Complex simulation: edit the full definition to avoid losing rules/templates.
+    $('f_full').value = JSON.stringify({
+      name: s.name, type: s.type, ws: s.ws, mq: s.mq,
+      rules: s.rules, defaultResponse: s.defaultResponse,
+    }, null, 2);
+    $('advDetails').open = true;
+  }
+  newDlg.showModal();
+}
+
+function buildFromForm() {
+  const name = val('f_name') || 'Mock';
+  const type = val('f_type');
+  const format = val('f_format');
+  const raw = $('f_body').value;
+
+  let responseBody = raw;
+  if (format === 'json' && raw.trim()) {
+    try { responseBody = JSON.parse(raw); }
+    catch (e) { throw new Error('El cuerpo de respuesta no es JSON válido:\n' + e.message); }
+  }
+
+  if (type === 'ws') {
+    const status = parseInt(val('f_status'), 10) || 200;
+    return {
+      name, type: 'ws',
+      ws: { port: parseInt(val('f_port'), 10) || 4001, path: val('f_path') || '/',
+            method: val('f_method') || 'GET', responseFormat: format, defaultStatusCode: status },
+      rules: [],
+      defaultResponse: { inlineBody: responseBody, statusCode: status },
+    };
+  }
+  return {
+    name, type: 'mq',
+    mq: { host: val('f_host') || 'localhost', port: parseInt(val('f_mqport'), 10) || 61613,
+          queueManager: '', channel: '', user: '', password: '',
+          inputQueue: val('f_inq'), outputQueue: val('f_outq'),
+          useReplyToQueue: true, preserveCorrelId: true, responseFormat: format },
+    rules: [],
+    defaultResponse: { inlineBody: responseBody },
+  };
+}
+
+async function saveSim() {
+  let body;
+  const full = $('f_full').value.trim();
+  if (full) {
+    try { body = JSON.parse(full); }
+    catch (e) { alert('La definición JSON completa no es válida:\n' + e.message); return; }
+  } else {
+    try { body = buildFromForm(); }
+    catch (e) { alert(e.message); return; }
+  }
+
+  if (editingId) {
+    const r = await api(`/simulations/${editingId}`, 'PUT', body);
+    if (r && r.error) { alert('No se pudo guardar: ' + r.error); return; }
+    // Apply changes to a running simulation by restarting it.
+    if (editingStatus === 'running') await api(`/simulations/${editingId}/restart`, 'POST');
+  } else {
+    const r = await api('/simulations', 'POST', body);
+    if (r && r.error) { alert('No se pudo crear: ' + r.error); return; }
+  }
+  newDlg.close(); load();
+}
+
+const newDlg = $('newDlg');
+const logDlg = $('logDlg');
+load();
+setInterval(load, 4000);
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "name": "test-simulator",
+  "version": "1.0.0",
+  "description": "Local mock server for simulating backend WS and MQ responses",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "^0.9.5",
+    "chokidar": "^4.0.3",
+    "cors": "^2.8.5",
+    "express": "^4.21.1",
+    "fast-xml-parser": "^4.5.1",
+    "pino": "^9.5.0",
+    "pino-pretty": "^13.0.0",
+    "stompit": "^1.0.0",
+    "uuid": "^11.0.3",
+    "xpath": "^0.0.34"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.25",
+    "@types/node": "^22.10.0",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

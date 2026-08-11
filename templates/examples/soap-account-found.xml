@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <GetAccountResponse xmlns="http://banco.example/accounts">
+      <AccountNumber>12345</AccountNumber>
+      <Holder>Maria Gomez</Holder>
+      <Currency>ARS</Currency>
+      <Status>ACTIVE</Status>
+      <Balance>250000.00</Balance>
+    </GetAccountResponse>
+  </soap:Body>
+</soap:Envelope>

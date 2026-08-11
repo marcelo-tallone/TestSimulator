@@ -1,0 +1,9 @@
+{
+  "numeroCuenta": "0000001",
+  "titular": "Juan Perez",
+  "moneda": "ARS",
+  "estado": "ACTIVA",
+  "saldo": 150000.50,
+  "sucursal": "001",
+  "consultadoEn": "{{$timestamp}}"
+}

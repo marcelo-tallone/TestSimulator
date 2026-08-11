@@ -1,0 +1,24 @@
+{
+  "name": "Mock SOAP Account Service",
+  "type": "ws",
+  "ws": {
+    "port": 7800,
+    "path": "/services/AccountService",
+    "method": "POST",
+    "responseFormat": "soap",
+    "defaultStatusCode": 200,
+    "defaultDelay": 100
+  },
+  "rules": [
+    {
+      "name": "GetAccount 12345 found",
+      "priority": 1,
+      "condition": { "type": "xpath", "expression": "//*[local-name()='AccountNumber'][text()='12345']" },
+      "response": { "templateFile": "examples/soap-account-found.xml", "statusCode": 200 }
+    }
+  ],
+  "defaultResponse": {
+    "inlineBody": "<GetAccountResponse><Status>NOT_FOUND</Status></GetAccountResponse>",
+    "statusCode": 200
+  }
+}

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.js.map
+.env
+simulations/simulations.json
+
+# Generated macOS icon artifacts
+assets/icon.png
+assets/AppIcon.icns
+assets/TestSimulator.iconset/

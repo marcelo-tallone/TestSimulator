@@ -1,0 +1,51 @@
+{
+  "name": "Mock ACE Transferencias",
+  "type": "mq",
+  "mq": {
+    "host": "localhost",
+    "port": 61613,
+    "queueManager": "QM1",
+    "channel": "DEV.APP.SVRCONN",
+    "user": "app",
+    "password": "banco",
+    "inputQueue": "TRANSF.REQUEST",
+    "outputQueue": "TRANSF.RESPONSE",
+    "useReplyToQueue": true,
+    "preserveCorrelId": true,
+    "responseFormat": "json"
+  },
+  "rules": [
+    {
+      "name": "Transfer exitosa",
+      "priority": 1,
+      "condition": { "type": "json-field", "field": "monto", "operator": "lt", "value": 1000000 },
+      "response": {
+        "templateFile": "examples/mq-transfer-ok.json",
+        "variables": [
+          { "name": "requestId", "source": "json-field", "path": "requestId" },
+          { "name": "cuentaOrigen", "source": "json-field", "path": "cuentaOrigen" },
+          { "name": "cuentaDestino", "source": "json-field", "path": "cuentaDestino" },
+          { "name": "monto", "source": "json-field", "path": "monto" },
+          { "name": "moneda", "source": "json-field", "path": "moneda" }
+        ]
+      }
+    },
+    {
+      "name": "Monto excede limite",
+      "priority": 2,
+      "condition": { "type": "json-field", "field": "monto", "operator": "gte", "value": 1000000 },
+      "response": {
+        "inlineBody": {
+          "requestId": "{{requestId}}",
+          "status": "ERROR",
+          "error": "Monto excede el limite diario permitido",
+          "timestamp": "{{$timestamp}}"
+        },
+        "variables": [{ "name": "requestId", "source": "json-field", "path": "requestId" }]
+      }
+    }
+  ],
+  "defaultResponse": {
+    "inlineBody": { "status": "OK", "movimientoId": "{{$uuid}}", "timestamp": "{{$timestamp}}" }
+  }
+}
