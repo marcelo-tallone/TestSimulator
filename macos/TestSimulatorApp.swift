@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var webView: WKWebView!
     var nodeProcess: Process?
     var startedServer = false
+    var quitting = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenu()
@@ -132,6 +133,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             p.standardOutput = fh
             p.standardError = fh
         }
+        // If the server dies while the app is open (e.g. it was killed), bring
+        // it back so the dashboard never ends up talking to a dead backend.
+        p.terminationHandler = { [weak self] _ in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                if self.quitting { return }
+                NSLog("TestSimulator: server exited unexpectedly, restarting...")
+                self.startServer()
+                self.showLoading()
+                self.waitForServer()
+            }
+        }
         do {
             try p.run()
             nodeProcess = p
@@ -179,6 +192,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        quitting = true
         guard startedServer, let p = nodeProcess, p.isRunning else { return }
         p.terminate() // SIGTERM -> graceful shutdown in the Node process
         let deadline = Date().addingTimeInterval(3)

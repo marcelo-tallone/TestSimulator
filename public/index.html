@@ -59,6 +59,11 @@
     padding: 12px; overflow: auto; max-height: 55vh; font-size: 12px; }
   .dlg-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
   .hint { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+  .dlgerr { color: var(--red); font-size: 12px; margin-bottom: 12px; white-space: pre-wrap;
+    background: rgba(255,107,107,.1); border: 1px solid rgba(255,107,107,.35);
+    border-radius: 8px; padding: 9px 11px; }
+  .banner { background: rgba(255,107,107,.12); border: 1px solid rgba(255,107,107,.4);
+    color: var(--red); padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -67,6 +72,7 @@
   <div class="summary" id="summary"></div>
 </header>
 <main>
+  <div class="banner" id="connBanner" style="display:none">⚠ Sin conexión con el servidor. Cerrá y reabrí la app (Cmd+Q y volver a abrir).</div>
   <div class="toolbar">
     <button class="primary" onclick="openNew()">+ Nueva simulación</button>
     <button class="start" onclick="api('/start-all','POST').then(load)">▶ Iniciar todas</button>
@@ -82,6 +88,7 @@
 <dialog id="newDlg">
   <h2 id="dlgTitle">Nueva simulación</h2>
   <div class="hint">Definí el endpoint y pegá el JSON (o XML) que querés que devuelva.</div>
+  <div class="dlgerr" id="dlgError" style="display:none"></div>
 
   <label>Nombre <input id="f_name" placeholder="Mock pagos" /></label>
 
@@ -194,8 +201,18 @@ async function copyText(text, btn) {
   setTimeout(() => { btn.textContent = old; }, 1000);
 }
 
+function showDlgError(msg) { const e = $('dlgError'); e.textContent = msg; e.style.display = 'block'; }
+function clearDlgError() { const e = $('dlgError'); e.textContent = ''; e.style.display = 'none'; }
+
 async function load() {
-  const [sims, status] = await Promise.all([api('/simulations'), api('/status')]);
+  let sims, status;
+  try {
+    [sims, status] = await Promise.all([api('/simulations'), api('/status')]);
+  } catch {
+    $('connBanner').style.display = 'block';
+    return;
+  }
+  $('connBanner').style.display = 'none';
   simsById = {};
   sims.forEach(s => { simsById[s.id] = s; });
   $('summary').innerHTML =
@@ -250,6 +267,7 @@ function resetForm() {
   $('f_inq').value = 'REQUEST.QUEUE'; $('f_outq').value = 'RESPONSE.QUEUE';
   $('f_body').value = ''; $('f_full').value = '';
   $('advDetails').open = false;
+  clearDlgError();
 }
 
 function openNew() {
@@ -334,24 +352,30 @@ function buildFromForm() {
 }
 
 async function saveSim() {
+  clearDlgError();
   let body;
   const full = $('f_full').value.trim();
   if (full) {
     try { body = JSON.parse(full); }
-    catch (e) { alert('La definición JSON completa no es válida:\n' + e.message); return; }
+    catch (e) { showDlgError('La definición JSON completa no es válida:\n' + e.message); return; }
   } else {
     try { body = buildFromForm(); }
-    catch (e) { alert(e.message); return; }
+    catch (e) { showDlgError(e.message); return; }
   }
 
-  if (editingId) {
-    const r = await api(`/simulations/${editingId}`, 'PUT', body);
-    if (r && r.error) { alert('No se pudo guardar: ' + r.error); return; }
-    // Apply changes to a running simulation by restarting it.
-    if (editingStatus === 'running') await api(`/simulations/${editingId}/restart`, 'POST');
-  } else {
-    const r = await api('/simulations', 'POST', body);
-    if (r && r.error) { alert('No se pudo crear: ' + r.error); return; }
+  try {
+    if (editingId) {
+      const r = await api(`/simulations/${editingId}`, 'PUT', body);
+      if (r && r.error) { showDlgError('No se pudo guardar: ' + r.error); return; }
+      // Apply changes to a running simulation by restarting it.
+      if (editingStatus === 'running') await api(`/simulations/${editingId}/restart`, 'POST');
+    } else {
+      const r = await api('/simulations', 'POST', body);
+      if (r && r.error) { showDlgError('No se pudo crear: ' + r.error); return; }
+    }
+  } catch {
+    showDlgError('No se pudo conectar con el servidor. Cerrá y reabrí la app (Cmd+Q y volver a abrir).');
+    return;
   }
   newDlg.close(); load();
 }
